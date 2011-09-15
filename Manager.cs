@@ -56,8 +56,10 @@ namespace Gibbed.ProjectData
                 {
                     using (var output = File.Create(Path.Combine(this.ProjectPath, "current.txt")))
                     {
-                        TextWriter writer = new StreamWriter(output);
-                        writer.WriteLine(value.Name);
+                        using (var writer = new StreamWriter(output))
+                        {
+                            writer.WriteLine(value.Name);
+                        }
                     }
                 }
 
@@ -94,20 +96,22 @@ namespace Gibbed.ProjectData
             }
 
             var currentPath = Path.Combine(projectPath, "current.txt");
-            if (File.Exists(currentPath) == false)
+            
+            manager._ActiveProject = null;
+            if (File.Exists(currentPath) == true)
             {
-                manager._ActiveProject = null;
-            }
-            else
-            {
-                using (var input = File.Open(currentPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var input = File.OpenRead(currentPath))
                 {
                     var reader = new StreamReader(input);
-                    string name = reader.ReadLine().Trim();
-
-                    if (manager[name] != null)
+                    
+                    string name = reader.ReadLine();
+                    if (name != null)
                     {
-                        manager._ActiveProject = manager[name];
+                        name = name.Trim();
+                        if (manager[name] != null)
+                        {
+                            manager._ActiveProject = manager[name];
+                        }
                     }
                 }
             }

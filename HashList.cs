@@ -34,6 +34,11 @@ namespace Gibbed.ProjectData
             this.Lookup = new Dictionary<TType, string>();
         }
 
+        public bool Contains(TType index)
+        {
+            return this.Lookup.ContainsKey(index);
+        }
+
         public string this[TType index]
         {
             get
