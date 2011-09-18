@@ -78,6 +78,11 @@ namespace Gibbed.ProjectData
 
         public static Manager Load()
         {
+            return Load(null);
+        }
+
+        public static Manager Load(string currentProject)
+        {
             string projectPath;
 
             var manager = new Manager();
@@ -95,22 +100,35 @@ namespace Gibbed.ProjectData
                 }
             }
 
-            var currentPath = Path.Combine(projectPath, "current.txt");
-            
-            manager._ActiveProject = null;
-            if (File.Exists(currentPath) == true)
+            if (currentProject != null)
             {
-                using (var input = File.OpenRead(currentPath))
+                manager._ActiveProject = null;
+
+                currentProject = currentProject.Trim();
+                if (manager[currentProject] != null)
                 {
-                    var reader = new StreamReader(input);
-                    
-                    string name = reader.ReadLine();
-                    if (name != null)
+                    manager._ActiveProject = manager[currentProject];
+                }
+            }
+            else
+            {
+                var currentPath = Path.Combine(projectPath, "current.txt");
+
+                manager._ActiveProject = null;
+                if (File.Exists(currentPath) == true)
+                {
+                    using (var input = File.OpenRead(currentPath))
                     {
-                        name = name.Trim();
-                        if (manager[name] != null)
+                        var reader = new StreamReader(input);
+
+                        string name = reader.ReadLine();
+                        if (name != null)
                         {
-                            manager._ActiveProject = manager[name];
+                            name = name.Trim();
+                            if (manager[name] != null)
+                            {
+                                manager._ActiveProject = manager[name];
+                            }
                         }
                     }
                 }
