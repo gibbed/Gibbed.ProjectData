@@ -34,13 +34,15 @@ namespace Gibbed.ProjectData
         public bool Hidden { get; private set; }
         public string InstallPath { get; private set; }
         public string ListsPath { get; private set; }
-        public List<string> Dependencies { get; private set; }
-
+        
+        internal List<string> Dependencies { get; private set; }
+        internal Dictionary<string, string> Settings { get; private set; }
         internal Manager Manager;
 
         private Project()
         {
             this.Dependencies = new List<string>();
+            this.Settings = new Dictionary<string, string>();
         }
 
         internal static Project Create(string path, Manager manager)
@@ -61,11 +63,26 @@ namespace Gibbed.ProjectData
                 project.ListsPath = Path.Combine(Path.GetDirectoryName(path), project.ListsPath);
             }
 
-            project.Dependencies = new List<string>();
+            project.Dependencies.Clear();
             var dependencies = nav.Select("/project/dependencies/dependency");
             while (dependencies.MoveNext() == true)
             {
                 project.Dependencies.Add(dependencies.Current.Value);
+            }
+
+            project.Settings.Clear();
+            var settings = nav.Select("/project/settings/setting");
+            while (settings.MoveNext() == true)
+            {
+                var name = settings.Current.GetAttribute("name", "");
+                var value = settings.Current.Value;
+
+                if (string.IsNullOrWhiteSpace(name) == true)
+                {
+                    throw new InvalidOperationException("setting name cannot be empty");
+                }
+
+                project.Settings[name] = value;
             }
 
             project.InstallPath = null;
@@ -166,6 +183,22 @@ namespace Gibbed.ProjectData
         public override string ToString()
         {
             return this.Name;
+        }
+
+        public TType GetSetting<TType>(string name, TType defaultValue)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException("name");
+            }
+
+            name = name.ToLowerInvariant();
+            if (this.Settings.ContainsKey(name) == false)
+            {
+                return defaultValue;
+            }
+
+            return (TType)Convert.ChangeType(this.Settings[name], typeof(TType));
         }
 
         #region LoadLists

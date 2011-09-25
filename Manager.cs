@@ -167,5 +167,20 @@ namespace Gibbed.ProjectData
 
             return this.ActiveProject.LoadLists(filter, hasher, modifier);
         }
+
+        public TType GetSetting<TType>(string name, TType defaultValue)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException("name");
+            }
+
+            if (this.ActiveProject == null)
+            {
+                return defaultValue;
+            }
+
+            return this.ActiveProject.GetSetting<TType>(name, defaultValue);
+        }
     }
 }
