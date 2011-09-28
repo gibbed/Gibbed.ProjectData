@@ -169,6 +169,7 @@ namespace Gibbed.ProjectData
         }
 
         public TType GetSetting<TType>(string name, TType defaultValue)
+            where TType: struct
         {
             if (name == null)
             {

@@ -82,7 +82,7 @@ namespace Gibbed.ProjectData
                     throw new InvalidOperationException("setting name cannot be empty");
                 }
 
-                project.Settings[name] = value;
+                project.Settings[name.ToLowerInvariant()] = value;
             }
 
             project.InstallPath = null;
@@ -186,6 +186,7 @@ namespace Gibbed.ProjectData
         }
 
         public TType GetSetting<TType>(string name, TType defaultValue)
+            where TType: struct
         {
             if (name == null)
             {
@@ -198,7 +199,22 @@ namespace Gibbed.ProjectData
                 return defaultValue;
             }
 
-            return (TType)Convert.ChangeType(this.Settings[name], typeof(TType));
+            var type = typeof(TType);
+
+            if (type.IsEnum == true)
+            {
+                TType result;
+                if (Enum.TryParse<TType>(this.Settings[name], out result) == false)
+                {
+                    throw new ArgumentException("bad enum value", "name");
+                }
+
+                return result;
+            }
+            else
+            {
+                return (TType)Convert.ChangeType(this.Settings[name], type);
+            }
         }
 
         #region LoadLists
