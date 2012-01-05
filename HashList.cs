@@ -51,5 +51,10 @@ namespace Gibbed.ProjectData
                 return this.Lookup[index];
             }
         }
+
+        public IEnumerable<string> GetStrings()
+        {
+            return this.Lookup.Values;
+        }
     }
 }
