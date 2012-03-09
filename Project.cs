@@ -47,8 +47,7 @@ namespace Gibbed.ProjectData
 
         internal static Project Create(string path, Manager manager)
         {
-            var project = new Project();
-            project.Manager = manager;
+            var project = new Project { Manager = manager };
 
             var doc = new XPathDocument(path);
             var nav = doc.CreateNavigator();
@@ -204,17 +203,15 @@ namespace Gibbed.ProjectData
             if (type.IsEnum == true)
             {
                 TType result;
-                if (Enum.TryParse<TType>(this.Settings[name], out result) == false)
+                if (Enum.TryParse(this.Settings[name], out result) == false)
                 {
                     throw new ArgumentException("bad enum value", "name");
                 }
 
                 return result;
             }
-            else
-            {
-                return (TType)Convert.ChangeType(this.Settings[name], type);
-            }
+
+            return (TType)Convert.ChangeType(this.Settings[name], type);
         }
 
         #region LoadLists
@@ -275,7 +272,8 @@ namespace Gibbed.ProjectData
                         {
                             break;
                         }
-                        else if (line.StartsWith(";") == true)
+
+                        if (line.StartsWith(";") == true)
                         {
                             continue;
                         }

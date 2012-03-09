@@ -35,9 +35,9 @@ namespace Gibbed.ProjectData
         {
         }
 
-        private string ProjectPath;
+        private string _ProjectPath;
 
-        private List<Project> Projects = new List<Project>();
+        private readonly List<Project> _Projects = new List<Project>();
         private Project _ActiveProject;
         public Project ActiveProject
         {
@@ -50,11 +50,11 @@ namespace Gibbed.ProjectData
             {
                 if (value == null)
                 {
-                    File.Delete(Path.Combine(this.ProjectPath, "current.txt"));
+                    File.Delete(Path.Combine(this._ProjectPath, "current.txt"));
                 }
                 else
                 {
-                    using (var output = File.Create(Path.Combine(this.ProjectPath, "current.txt")))
+                    using (var output = File.Create(Path.Combine(this._ProjectPath, "current.txt")))
                     {
                         using (var writer = new StreamWriter(output))
                         {
@@ -71,7 +71,7 @@ namespace Gibbed.ProjectData
         {
             get
             {
-                return this.Projects.SingleOrDefault(
+                return this._Projects.SingleOrDefault(
                     p => p.Name.ToLowerInvariant() == name.ToLowerInvariant());
             }
         }
@@ -83,20 +83,19 @@ namespace Gibbed.ProjectData
 
         public static Manager Load(string currentProject)
         {
-            string projectPath;
-
             var manager = new Manager();
 
+            string projectPath;
             projectPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             projectPath = Path.Combine(projectPath, "projects");
 
-            manager.ProjectPath = projectPath;
+            manager._ProjectPath = projectPath;
 
             if (Directory.Exists(projectPath) == true)
             {
                 foreach (string xmlPath in Directory.GetFiles(projectPath, "*.xml", SearchOption.TopDirectoryOnly))
                 {
-                    manager.Projects.Add(Project.Create(xmlPath, manager));
+                    manager._Projects.Add(Project.Create(xmlPath, manager));
                 }
             }
 
@@ -139,7 +138,7 @@ namespace Gibbed.ProjectData
 
         public IEnumerator<Project> GetEnumerator()
         {
-            return this.Projects.Where(
+            return this._Projects.Where(
                     p =>
                         p.Hidden == false &&
                         p.InstallPath != null
@@ -148,7 +147,7 @@ namespace Gibbed.ProjectData
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return this.Projects.Where(
+            return this._Projects.Where(
                     p =>
                         p.Hidden == false &&
                         p.InstallPath != null
@@ -181,7 +180,7 @@ namespace Gibbed.ProjectData
                 return defaultValue;
             }
 
-            return this.ActiveProject.GetSetting<TType>(name, defaultValue);
+            return this.ActiveProject.GetSetting(name, defaultValue);
         }
     }
 }
