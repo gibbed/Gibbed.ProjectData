@@ -34,7 +34,7 @@ namespace Gibbed.ProjectData
         public bool Hidden { get; private set; }
         public string InstallPath { get; private set; }
         public string ListsPath { get; private set; }
-        
+
         internal List<string> Dependencies { get; private set; }
         internal Dictionary<string, string> Settings { get; private set; }
         internal Manager Manager;
@@ -47,31 +47,59 @@ namespace Gibbed.ProjectData
 
         internal static Project Create(string path, Manager manager)
         {
-            var project = new Project { Manager = manager };
+            path = Path.GetFullPath(path);
+            if (path == null)
+            {
+                throw new InvalidOperationException();
+            }
+
+            var dir = Path.GetDirectoryName(path);
+            if (dir == null)
+            {
+                throw new InvalidOperationException();
+            }
+
+            var project = new Project
+            {
+                Manager = manager
+            };
 
             var doc = new XPathDocument(path);
             var nav = doc.CreateNavigator();
 
-            project.Name = nav.SelectSingleNode("/project/name").Value;
-            project.ListsPath = nav.SelectSingleNode("/project/list_location").Value;
+            var projectNameNode = nav.SelectSingleNode("/project/name");
+            if (projectNameNode == null)
+            {
+                throw new InvalidOperationException();
+            }
+            project.Name = projectNameNode.Value;
+
+            var listsPathNode = nav.SelectSingleNode("/project/list_location");
+            if (listsPathNode == null)
+            {
+                throw new InvalidOperationException();
+            }
+            project.ListsPath = listsPathNode.Value;
 
             project.Hidden = nav.SelectSingleNode("/project/hidden") != null;
 
             if (Path.IsPathRooted(project.ListsPath) == false)
             {
-                project.ListsPath = Path.Combine(Path.GetDirectoryName(path), project.ListsPath);
+                project.ListsPath = Path.Combine(dir, project.ListsPath);
             }
 
             project.Dependencies.Clear();
             var dependencies = nav.Select("/project/dependencies/dependency");
-            while (dependencies.MoveNext() == true)
+            while (dependencies.MoveNext() == true &&
+                   dependencies.Current != null)
             {
                 project.Dependencies.Add(dependencies.Current.Value);
             }
 
             project.Settings.Clear();
             var settings = nav.Select("/project/settings/setting");
-            while (settings.MoveNext() == true)
+            while (settings.MoveNext() == true &&
+                   settings.Current != null)
             {
                 var name = settings.Current.GetAttribute("name", "");
                 var value = settings.Current.Value;
@@ -86,29 +114,64 @@ namespace Gibbed.ProjectData
 
             project.InstallPath = null;
             var locations = nav.Select("/project/install_locations/install_location");
-            while (locations.MoveNext() == true)
+            while (locations.MoveNext() == true &&
+                   locations.Current != null)
             {
                 bool failed = true;
 
                 var actions = locations.Current.Select("action");
                 string locationPath = null;
-                while (actions.MoveNext() == true)
+                while (actions.MoveNext() == true &&
+                       actions.Current != null)
                 {
-                    string type = actions.Current.GetAttribute("type", "");
+                    var type = actions.Current.GetAttribute("type", "");
 
                     switch (type)
                     {
                         case "registry":
                         {
-                            string key = actions.Current.GetAttribute("key", "");
-                            string value = actions.Current.GetAttribute("value", "");
+                            var keyName = actions.Current.GetAttribute("key", "");
+                            var valueName = actions.Current.GetAttribute("value", "");
 
-                            path = (string)Registry.GetValue(key, value, null);
-
-                            if (path != null) // && Directory.Exists(path) == true)
+                            var value = (string)Registry.GetValue(keyName, valueName, null);
+                            if (value != null) // && Directory.Exists(path) == true)
                             {
-                                locationPath = path;
+                                locationPath = value;
                                 failed = false;
+                            }
+
+                            break;
+                        }
+
+                        case "registryview":
+                        {
+                            RegistryView view;
+                            if (Enum.TryParse(actions.Current.GetAttribute("view", ""), out view) == false)
+                            {
+                                throw new InvalidOperationException();
+                            }
+
+                            RegistryHive hive;
+                            if (Enum.TryParse(actions.Current.GetAttribute("hive", ""), out hive) == false)
+                            {
+                                throw new InvalidOperationException();
+                            }
+
+                            var localKey = RegistryKey.OpenBaseKey(hive, view);
+                            //if (localKey != null)
+                            {
+                                var keyName = actions.Current.GetAttribute("subkey", "");
+                                localKey = localKey.OpenSubKey(keyName);
+                                if (localKey != null)
+                                {
+                                    var valueName = actions.Current.GetAttribute("value", "");
+                                    var value = (string)localKey.GetValue(valueName, null);
+                                    if (string.IsNullOrEmpty(value) == false)
+                                    {
+                                        locationPath = value;
+                                        failed = false;
+                                    }
+                                }
                             }
 
                             break;
@@ -185,7 +248,7 @@ namespace Gibbed.ProjectData
         }
 
         public TType GetSetting<TType>(string name, TType defaultValue)
-            where TType: struct
+            where TType : struct
         {
             if (name == null)
             {
@@ -246,6 +309,7 @@ namespace Gibbed.ProjectData
             return list;
         }
         #endregion
+
         #region LoadListsFrom
         private static void LoadListsFrom<TType>(
             string basePath,
