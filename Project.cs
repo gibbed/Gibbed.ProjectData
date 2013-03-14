@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security;
 using System.Xml.XPath;
 using Microsoft.Win32;
 
@@ -133,11 +134,19 @@ namespace Gibbed.ProjectData
                             var keyName = actions.Current.GetAttribute("key", "");
                             var valueName = actions.Current.GetAttribute("value", "");
 
-                            var value = (string)Registry.GetValue(keyName, valueName, null);
-                            if (value != null) // && Directory.Exists(path) == true)
+                            try
                             {
-                                locationPath = value;
-                                failed = false;
+                                var value = (string)Registry.GetValue(keyName, valueName, null);
+                                if (value != null) // && Directory.Exists(path) == true)
+                                {
+                                    locationPath = value;
+                                    failed = false;
+                                }
+                            }
+                            catch (SecurityException)
+                            {
+                                failed = true;
+                                throw;
                             }
 
                             break;
@@ -157,21 +166,28 @@ namespace Gibbed.ProjectData
                                 throw new InvalidOperationException();
                             }
 
-                            var localKey = RegistryKey.OpenBaseKey(hive, view);
-                            //if (localKey != null)
+                            try
                             {
-                                var keyName = actions.Current.GetAttribute("subkey", "");
-                                localKey = localKey.OpenSubKey(keyName);
-                                if (localKey != null)
+                                var localKey = RegistryKey.OpenBaseKey(hive, view);
+                                //if (localKey != null)
                                 {
-                                    var valueName = actions.Current.GetAttribute("value", "");
-                                    var value = (string)localKey.GetValue(valueName, null);
-                                    if (string.IsNullOrEmpty(value) == false)
+                                    var keyName = actions.Current.GetAttribute("subkey", "");
+                                    localKey = localKey.OpenSubKey(keyName);
+                                    if (localKey != null)
                                     {
-                                        locationPath = value;
-                                        failed = false;
+                                        var valueName = actions.Current.GetAttribute("value", "");
+                                        var value = (string)localKey.GetValue(valueName, null);
+                                        if (string.IsNullOrEmpty(value) == false)
+                                        {
+                                            locationPath = value;
+                                            failed = false;
+                                        }
                                     }
                                 }
+                            }
+                            catch (SecurityException)
+                            {
+                                failed = true;
                             }
 
                             break;
