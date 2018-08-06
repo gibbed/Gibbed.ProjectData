@@ -263,6 +263,22 @@ namespace Gibbed.ProjectData
             return this.Name;
         }
 
+        public string GetSetting(string name, string defaultValue)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException("name");
+            }
+
+            name = name.ToLowerInvariant();
+            if (this.Settings.ContainsKey(name) == false)
+            {
+                return defaultValue;
+            }
+
+            return this.Settings[name];
+        }
+
         public TType GetSetting<TType>(string name, TType defaultValue)
             where TType : struct
         {
