@@ -371,18 +371,19 @@ namespace Gibbed.ProjectData
 
                         TType hash = hasher(line);
 
-                        if (list.Lookup.ContainsKey(hash) == true &&
-                            list.Lookup[hash] != line)
+                        string otherLine;
+                        if (list.Lookup.TryGetValue(hash, out otherLine) == false)
                         {
-                            string otherLine = list.Lookup[hash];
+                            list.Lookup[hash] = line;
+                        }
+                        else if (otherLine.ToLowerInvariant() != line.ToLowerInvariant())
+                        {
                             throw new InvalidOperationException(
                                 string.Format(
                                     "hash collision ('{0}' vs '{1}')",
                                     line,
                                     otherLine));
                         }
-
-                        list.Lookup[hash] = line;
                     }
                 }
             }
