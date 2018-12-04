@@ -1,4 +1,4 @@
-﻿/* Copyright (c) 2011 Rick (rick 'at' gibbed 'dot' us)
+﻿/* Copyright (c) 2018 Rick (rick 'at' gibbed 'dot' us)
  * 
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -263,22 +263,6 @@ namespace Gibbed.ProjectData
             return this.Name;
         }
 
-        public string GetSetting(string name, string defaultValue)
-        {
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            name = name.ToLowerInvariant();
-            if (this.Settings.ContainsKey(name) == false)
-            {
-                return defaultValue;
-            }
-
-            return this.Settings[name];
-        }
-
         public TType GetSetting<TType>(string name, TType defaultValue)
             where TType : struct
         {
@@ -310,10 +294,21 @@ namespace Gibbed.ProjectData
         }
 
         #region LoadLists
+        public HashList<TType> LoadLists<TType>(string filter, Func<string, TType> hasher)
+        {
+            return this.LoadLists(filter, hasher, null, null);
+        }
+
+        public HashList<TType> LoadLists<TType>(string filter, Func<string, TType> hasher, Func<string, string> modifier)
+        {
+            return this.LoadLists(filter, hasher, modifier, null);
+        }
+
         public HashList<TType> LoadLists<TType>(
             string filter,
             Func<string, TType> hasher,
-            Func<string, string> modifier)
+            Func<string, string> modifier,
+            Action<TType, string, string> extra)
         {
             var list = new HashList<TType>();
 
@@ -327,6 +322,7 @@ namespace Gibbed.ProjectData
                         filter,
                         hasher,
                         modifier,
+                        extra,
                         list);
                 }
             }
@@ -336,6 +332,7 @@ namespace Gibbed.ProjectData
                 filter,
                 hasher,
                 modifier,
+                extra,
                 list);
 
             return list;
@@ -348,6 +345,7 @@ namespace Gibbed.ProjectData
             string filter,
             Func<string, TType> hasher,
             Func<string, string> modifier,
+            Action<TType, string, string> extra,
             HashList<TType> list)
         {
             if (Directory.Exists(basePath) == false)
@@ -380,25 +378,25 @@ namespace Gibbed.ProjectData
                             continue;
                         }
 
-                        if (modifier != null)
-                        {
-                            line = modifier(line);
-                        }
+                        string source = modifier == null ? line : modifier(line);
+                        TType hash = hasher(source);
 
-                        TType hash = hasher(line);
-
-                        string otherLine;
-                        if (list.Lookup.TryGetValue(hash, out otherLine) == false)
+                        if (list.Lookup.ContainsKey(hash) == true &&
+                            list.Lookup[hash] != source)
                         {
-                            list.Lookup[hash] = line;
-                        }
-                        else if (otherLine.ToLowerInvariant() != line.ToLowerInvariant())
-                        {
+                            string otherSource = list.Lookup[hash];
                             throw new InvalidOperationException(
                                 string.Format(
                                     "hash collision ('{0}' vs '{1}')",
-                                    line,
-                                    otherLine));
+                                    source,
+                                    otherSource));
+                        }
+
+                        list.Lookup[hash] = source;
+
+                        if (extra != null)
+                        {
+                            extra(hash, source, line);
                         }
                     }
                 }

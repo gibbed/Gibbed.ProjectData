@@ -1,4 +1,4 @@
-﻿/* Copyright (c) 2011 Rick (rick 'at' gibbed 'dot' us)
+﻿/* Copyright (c) 2018 Rick (rick 'at' gibbed 'dot' us)
  * 
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -31,20 +31,18 @@ namespace Gibbed.ProjectData
 {
     public class Manager : IEnumerable<Project>
     {
+        private string _ProjectPath;
+        private readonly List<Project> _Projects;
+        private Project _ActiveProject;
+
         private Manager()
         {
+            this._Projects = new List<Project>();
         }
 
-        private string _ProjectPath;
-
-        private readonly List<Project> _Projects = new List<Project>();
-        private Project _ActiveProject;
         public Project ActiveProject
         {
-            get
-            {
-                return this._ActiveProject;
-            }
+            get { return this._ActiveProject; }
 
             set
             {
@@ -55,11 +53,9 @@ namespace Gibbed.ProjectData
                 else
                 {
                     using (var output = File.Create(Path.Combine(this._ProjectPath, "current.txt")))
+                    using (var writer = new StreamWriter(output))
                     {
-                        using (var writer = new StreamWriter(output))
-                        {
-                            writer.WriteLine(value.Name);
-                        }
+                        writer.WriteLine(value.Name);
                     }
                 }
 
@@ -87,7 +83,7 @@ namespace Gibbed.ProjectData
 
             string projectPath;
             projectPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            projectPath = Path.Combine(projectPath, "projects");
+            projectPath = projectPath != null ? Path.Combine(projectPath, "projects") : "projects";
 
             manager._ProjectPath = projectPath;
 
@@ -117,9 +113,8 @@ namespace Gibbed.ProjectData
                 if (File.Exists(currentPath) == true)
                 {
                     using (var input = File.OpenRead(currentPath))
+                    using (var reader = new StreamReader(input))
                     {
-                        var reader = new StreamReader(input);
-
                         string name = reader.ReadLine();
                         if (name != null)
                         {
@@ -138,52 +133,49 @@ namespace Gibbed.ProjectData
 
         public IEnumerator<Project> GetEnumerator()
         {
-            return this._Projects.Where(
-                    p =>
-                        p.Hidden == false &&
-                        p.InstallPath != null
-                ).GetEnumerator();
+            return this._Projects
+                       .Where(p => p.Hidden == false &&
+                                   p.InstallPath != null)
+                       .GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return this._Projects.Where(
-                    p =>
-                        p.Hidden == false &&
-                        p.InstallPath != null
-                ).GetEnumerator();
+            return this._Projects
+                       .Where(p =>
+                              p.Hidden == false &&
+                              p.InstallPath != null)
+                       .GetEnumerator();
+        }
+
+        #region LoadLists
+        public HashList<TType> LoadLists<TType>(string filter, Func<string, TType> hasher)
+        {
+            return this.LoadLists(filter, hasher, null, null);
+        }
+
+        public HashList<TType> LoadLists<TType>(string filter, Func<string, TType> hasher, Func<string, string> modifier)
+        {
+            return this.LoadLists(filter, hasher, modifier, null);
         }
 
         public HashList<TType> LoadLists<TType>(
             string filter,
             Func<string, TType> hasher,
-            Func<string, string> modifier)
+            Func<string, string> modifier,
+            Action<TType, string, string> extra)
         {
             if (this.ActiveProject == null)
             {
                 return HashList<TType>.Dummy;
             }
 
-            return this.ActiveProject.LoadLists(filter, hasher, modifier);
+            return this.ActiveProject.LoadLists(filter, hasher, modifier, extra);
         }
-
-        public string GetSetting(string name, string defaultValue)
-        {
-            if (name == null)
-            {
-                throw new ArgumentNullException("name");
-            }
-
-            if (this.ActiveProject == null)
-            {
-                return defaultValue;
-            }
-
-            return this.ActiveProject.GetSetting(name, defaultValue);
-        }
+        #endregion
 
         public TType GetSetting<TType>(string name, TType defaultValue)
-            where TType: struct
+            where TType : struct
         {
             if (name == null)
             {
