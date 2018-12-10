@@ -166,28 +166,38 @@ namespace Gibbed.ProjectData
                                 throw new InvalidOperationException();
                             }
 
+                            RegistryKey baseKey = null;
+                            RegistryKey subKey = null;
                             try
                             {
-                                var localKey = RegistryKey.OpenBaseKey(hive, view);
-                                //if (localKey != null)
+                                baseKey = RegistryKey.OpenBaseKey(hive, view);
+                                var keyName = actions.Current.GetAttribute("subkey", "");
+                                subKey = baseKey.OpenSubKey(keyName);
+                                if (subKey != null)
                                 {
-                                    var keyName = actions.Current.GetAttribute("subkey", "");
-                                    localKey = localKey.OpenSubKey(keyName);
-                                    if (localKey != null)
+                                    var valueName = actions.Current.GetAttribute("value", "");
+                                    var value = (string)subKey.GetValue(valueName, null);
+                                    if (string.IsNullOrEmpty(value) == false)
                                     {
-                                        var valueName = actions.Current.GetAttribute("value", "");
-                                        var value = (string)localKey.GetValue(valueName, null);
-                                        if (string.IsNullOrEmpty(value) == false)
-                                        {
-                                            locationPath = value;
-                                            failed = false;
-                                        }
+                                        locationPath = value;
+                                        failed = false;
                                     }
                                 }
                             }
                             catch (SecurityException)
                             {
-                                failed = true;
+                            }
+                            finally
+                            {
+                                if (subKey != null)
+                                {
+                                    baseKey.Dispose();
+                                }
+
+                                if (baseKey != null)
+                                {
+                                    baseKey.Dispose();
+                                }
                             }
 
                             break;
