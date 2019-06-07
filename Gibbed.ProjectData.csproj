@@ -8,7 +8,9 @@
     <Description>http://gib.me/</Description>
     <Copyright>Copyright © Gibbed 2019</Copyright>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="Microsoft.CSharp" />
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="Microsoft.Win32.Registry">
+      <Version>4.5.0</Version>
+    </PackageReference>
   </ItemGroup>
 </Project>
