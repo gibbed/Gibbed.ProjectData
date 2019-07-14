@@ -48,12 +48,12 @@ namespace Gibbed.ProjectData
         {
             get
             {
-                if (this.Lookup.ContainsKey(index) == false)
+                string value;
+                if (this.Lookup.TryGetValue(index, out value) == false)
                 {
                     return null;
                 }
-
-                return this.Lookup[index];
+                return value;
             }
         }
 

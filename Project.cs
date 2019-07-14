@@ -297,7 +297,9 @@ namespace Gibbed.ProjectData
             }
 
             name = name.ToLowerInvariant();
-            if (this.Settings.ContainsKey(name) == false)
+
+            string stringValue;
+            if (this.Settings.TryGetValue(name, out stringValue) == false)
             {
                 return defaultValue;
             }
@@ -306,13 +308,14 @@ namespace Gibbed.ProjectData
             if (type.IsEnum == true)
             {
                 TType result;
-                if (Enum.TryParse(this.Settings[name], out result) == false)
+                if (Enum.TryParse(stringValue, out result) == false)
                 {
                     throw new ArgumentException("bad enum value", "name");
                 }
                 return result;
             }
-            return (TType)Convert.ChangeType(this.Settings[name], type);
+
+            return (TType)Convert.ChangeType(stringValue, type);
         }
 
         #region LoadLists
@@ -403,10 +406,10 @@ namespace Gibbed.ProjectData
                         string source = modifier == null ? line : modifier(line);
                         TType hash = hasher(source);
 
-                        if (list.Lookup.ContainsKey(hash) == true &&
-                            list.Lookup[hash] != source)
+                        string otherSource;
+                        if (list.Lookup.TryGetValue(hash, out otherSource) == true &&
+                            otherSource != source)
                         {
-                            string otherSource = list.Lookup[hash];
                             throw new InvalidOperationException(
                                 string.Format(
                                     "hash collision ('{0}' vs '{1}')",
