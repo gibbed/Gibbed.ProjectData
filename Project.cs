@@ -273,6 +273,21 @@ namespace Gibbed.ProjectData
             return this.Name;
         }
 
+        public string GetSetting(string name, string defaultValue)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException("name");
+            }
+            name = name.ToLowerInvariant();
+            string value;
+            if (this.Settings.TryGetValue(name, out value) == false)
+            {
+                return defaultValue;
+            }
+            return value;
+        }
+
         public TType GetSetting<TType>(string name, TType defaultValue)
             where TType : struct
         {
@@ -288,7 +303,6 @@ namespace Gibbed.ProjectData
             }
 
             var type = typeof(TType);
-
             if (type.IsEnum == true)
             {
                 TType result;
@@ -296,10 +310,8 @@ namespace Gibbed.ProjectData
                 {
                     throw new ArgumentException("bad enum value", "name");
                 }
-
                 return result;
             }
-
             return (TType)Convert.ChangeType(this.Settings[name], type);
         }
 

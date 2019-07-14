@@ -174,6 +174,21 @@ namespace Gibbed.ProjectData
         }
         #endregion
 
+        public string GetSetting(string name, string defaultValue)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException("name");
+            }
+
+            if (this.ActiveProject == null)
+            {
+                return defaultValue;
+            }
+
+            return this.ActiveProject.GetSetting(name, defaultValue);
+        }
+
         public TType GetSetting<TType>(string name, TType defaultValue)
             where TType : struct
         {
