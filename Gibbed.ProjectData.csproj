@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;net45;net40</TargetFrameworks>
     <AssemblyTitle>Gibbed.ProjectData</AssemblyTitle>
     <Product>Gibbed.ProjectData</Product>
     <Company>Gibbed</Company>
@@ -8,7 +7,25 @@
     <Description>http://gib.me/</Description>
     <Copyright>Copyright © Gibbed 2019</Copyright>
   </PropertyGroup>
-  <ItemGroup Condition="'$(TargetFramework)'=='netstandard2.0'">
-    <PackageReference Include="Microsoft.Win32.Registry" Version="4.5.0" />
+  <PropertyGroup Condition=" '$(GibbedProjectData_TargetFrameworksToBuild)' == '' ">
+    <GibbedProjectData_TargetFrameworksToBuild>$(TargetFrameworksToBuild)</GibbedProjectData_TargetFrameworksToBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(GibbedProjectData_TargetFrameworksToBuild)' == '' ">
+    <TargetFrameworks>netstandard2.0;net40;net45;net472;net48;net5.0</TargetFrameworks>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(GibbedProjectData_TargetFrameworksToBuild)' != '' ">
+    <TargetFrameworks>$(GibbedProjectData_TargetFrameworksToBuild)</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
+    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net5.0' ">
+    <PackageReference Include="Microsoft.Win32.Registry" Version="5.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove=".git*" />
   </ItemGroup>
 </Project>

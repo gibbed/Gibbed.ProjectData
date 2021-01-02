@@ -1,4 +1,4 @@
-﻿/* Copyright (c) 2019 Rick (rick 'at' gibbed 'dot' us)
+﻿/* Copyright (c) 2021 Rick (rick 'at' gibbed 'dot' us)
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -48,12 +48,7 @@ namespace Gibbed.ProjectData
         {
             get
             {
-                string value;
-                if (this.Lookup.TryGetValue(index, out value) == false)
-                {
-                    return null;
-                }
-                return value;
+                return this.Lookup.TryGetValue(index, out string value) == false ? null : value;
             }
         }
 

@@ -1,4 +1,4 @@
-﻿/* Copyright (c) 2019 Rick (rick 'at' gibbed 'dot' us)
+﻿/* Copyright (c) 2021 Rick (rick 'at' gibbed 'dot' us)
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -23,22 +23,20 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security;
-using System.Xml.XPath;
-using Microsoft.Win32;
+using Newtonsoft.Json;
 
 namespace Gibbed.ProjectData
 {
     public sealed class Project
     {
-        public string Name { get; private set; }
-        public bool Hidden { get; private set; }
-        public string InstallPath { get; private set; }
-        public string ListsPath { get; private set; }
+        public string Name { get; init; }
+        public bool IsHidden { get; init; }
+        public string InstallPath { get; init; }
+        public string ListsPath { get; init; }
 
-        internal List<string> Dependencies { get; private set; }
-        internal Dictionary<string, string> Settings { get; private set; }
-        internal Manager Manager;
+        internal List<string> Dependencies { get; }
+        internal Dictionary<string, string> Settings { get; }
+        internal Manager Manager { get; init; }
 
         private Project()
         {
@@ -46,246 +44,67 @@ namespace Gibbed.ProjectData
             this.Settings = new Dictionary<string, string>();
         }
 
-        internal static Project Create(string path, Manager manager)
+        internal static Project Load(string path, Manager manager)
         {
+            if (string.IsNullOrEmpty(path) == true)
+            {
+                throw new ArgumentNullException(nameof(path));
+            }
             path = Path.GetFullPath(path);
-            if (path == null)
-            {
-                throw new InvalidOperationException();
-            }
 
-            var dir = Path.GetDirectoryName(path);
-            if (dir == null)
-            {
-                throw new InvalidOperationException();
-            }
+            var definition = LoadJson<Definitions.ProjectDefinition>(path);
+
+            var parentPath = Path.GetDirectoryName(path);
+
+            var listsPath =
+                string.IsNullOrEmpty(parentPath) == false &&
+                Path.IsPathRooted(definition.ListsPath) == false
+                    ? Path.Combine(parentPath, definition.ListsPath)
+                    : Path.GetFullPath(definition.ListsPath);
 
             var project = new Project
             {
-                Manager = manager
+                Name = definition.Name,
+                IsHidden = definition.IsHidden,
+                InstallPath = InstallLocation.Get(parentPath, definition.InstallLocations),
+                ListsPath = listsPath,
+                Manager = manager,
             };
-
-            var doc = new XPathDocument(path);
-            var nav = doc.CreateNavigator();
-
-            var projectNameNode = nav.SelectSingleNode("/project/name");
-            if (projectNameNode == null)
+            project.Dependencies.AddRange(definition.Dependencies);
+            foreach (var kv in definition.Settings)
             {
-                throw new InvalidOperationException();
+                project.Settings.Add(kv.Key, kv.Value);
             }
-            project.Name = projectNameNode.Value;
-
-            var listsPathNode = nav.SelectSingleNode("/project/list_location");
-            if (listsPathNode == null)
-            {
-                throw new InvalidOperationException();
-            }
-            project.ListsPath = listsPathNode.Value;
-
-            project.Hidden = nav.SelectSingleNode("/project/hidden") != null;
-
-            if (Path.IsPathRooted(project.ListsPath) == false)
-            {
-                project.ListsPath = Path.Combine(dir, project.ListsPath);
-            }
-
-            project.Dependencies.Clear();
-            var dependencies = nav.Select("/project/dependencies/dependency");
-            while (dependencies.MoveNext() == true &&
-                   dependencies.Current != null)
-            {
-                project.Dependencies.Add(dependencies.Current.Value);
-            }
-
-            project.Settings.Clear();
-            var settings = nav.Select("/project/settings/setting");
-            while (settings.MoveNext() == true &&
-                   settings.Current != null)
-            {
-                var name = settings.Current.GetAttribute("name", "");
-                var value = settings.Current.Value;
-
-                if (string.IsNullOrWhiteSpace(name) == true)
-                {
-                    throw new InvalidOperationException("setting name cannot be empty");
-                }
-
-                project.Settings[name.ToLowerInvariant()] = value;
-            }
-
-            project.InstallPath = null;
-            var locations = nav.Select("/project/install_locations/install_location");
-            while (locations.MoveNext() == true &&
-                   locations.Current != null)
-            {
-                bool failed = true;
-
-                var actions = locations.Current.Select("action");
-                string locationPath = null;
-                while (actions.MoveNext() == true &&
-                       actions.Current != null)
-                {
-                    var type = actions.Current.GetAttribute("type", "");
-
-                    switch (type)
-                    {
-                        case "registry":
-                        {
-                            var keyName = actions.Current.GetAttribute("key", "");
-                            var valueName = actions.Current.GetAttribute("value", "");
-
-                            try
-                            {
-                                var value = (string)Registry.GetValue(keyName, valueName, null);
-                                if (value != null) // && Directory.Exists(path) == true)
-                                {
-                                    locationPath = value;
-                                    failed = false;
-                                }
-                            }
-                            catch (SecurityException)
-                            {
-                                failed = true;
-                                throw;
-                            }
-
-                            break;
-                        }
-
-                        case "registryview":
-                        {
-                            RegistryView view;
-                            if (Enum.TryParse(actions.Current.GetAttribute("view", ""), out view) == false)
-                            {
-                                throw new InvalidOperationException();
-                            }
-
-                            RegistryHive hive;
-                            if (Enum.TryParse(actions.Current.GetAttribute("hive", ""), out hive) == false)
-                            {
-                                throw new InvalidOperationException();
-                            }
-
-                            RegistryKey baseKey = null;
-                            RegistryKey subKey = null;
-                            try
-                            {
-                                baseKey = RegistryKey.OpenBaseKey(hive, view);
-                                var keyName = actions.Current.GetAttribute("subkey", "");
-                                subKey = baseKey.OpenSubKey(keyName);
-                                if (subKey != null)
-                                {
-                                    var valueName = actions.Current.GetAttribute("value", "");
-                                    var value = (string)subKey.GetValue(valueName, null);
-                                    if (string.IsNullOrEmpty(value) == false)
-                                    {
-                                        locationPath = value;
-                                        failed = false;
-                                    }
-                                }
-                            }
-                            catch (SecurityException)
-                            {
-                            }
-                            finally
-                            {
-                                if (subKey != null)
-                                {
-                                    baseKey.Dispose();
-                                }
-
-                                if (baseKey != null)
-                                {
-                                    baseKey.Dispose();
-                                }
-                            }
-
-                            break;
-                        }
-
-                        case "path":
-                        {
-                            locationPath = actions.Current.Value;
-
-                            if (Directory.Exists(locationPath) == true)
-                            {
-                                failed = false;
-                            }
-
-                            break;
-                        }
-
-                        case "combine":
-                        {
-                            locationPath = Path.Combine(locationPath, actions.Current.Value);
-
-                            if (Directory.Exists(locationPath) == true)
-                            {
-                                failed = false;
-                            }
-
-                            break;
-                        }
-
-                        case "directory_name":
-                        {
-                            locationPath = Path.GetDirectoryName(locationPath);
-
-                            if (Directory.Exists(locationPath) == true)
-                            {
-                                failed = false;
-                            }
-
-                            break;
-                        }
-
-                        case "fix":
-                        {
-                            locationPath = locationPath.Replace('/', '\\');
-                            failed = false;
-                            break;
-                        }
-
-                        default:
-                        {
-                            throw new InvalidOperationException("unhandled install location action type");
-                        }
-                    }
-
-                    if (failed == true)
-                    {
-                        break;
-                    }
-                }
-
-                if (failed == false && Directory.Exists(locationPath) == true)
-                {
-                    project.InstallPath = locationPath;
-                    break;
-                }
-            }
-
             return project;
+        }
+
+        private static TType LoadJson<TType>(string path)
+        {
+            using var stream = File.OpenRead(path);
+            using var streamReader = new StreamReader(stream);
+            using var jsonReader = new JsonTextReader(streamReader);
+            var jsonSettings = new JsonSerializerSettings()
+            {
+                MissingMemberHandling = MissingMemberHandling.Error,
+            };
+            var jsonSerializer = JsonSerializer.CreateDefault(jsonSettings);
+            return jsonSerializer.Deserialize<TType>(jsonReader);
         }
 
         public override string ToString()
         {
-            return this.Name;
+            return this.Name ?? base.ToString();
         }
 
         public string GetSetting(string name, string defaultValue)
         {
-            if (name == null)
+            if (string.IsNullOrEmpty(name) == true)
             {
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
             }
-            name = name.ToLowerInvariant();
-            string value;
-            if (this.Settings.TryGetValue(name, out value) == false)
-            {
-                return defaultValue;
-            }
-            return value;
+            return this.Settings.TryGetValue(name, out var value) == true
+                ? value
+                : defaultValue;
         }
 
         public TType GetSetting<TType>(string name, TType defaultValue)
@@ -293,13 +112,10 @@ namespace Gibbed.ProjectData
         {
             if (name == null)
             {
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
             }
 
-            name = name.ToLowerInvariant();
-
-            string stringValue;
-            if (this.Settings.TryGetValue(name, out stringValue) == false)
+            if (this.Settings.TryGetValue(name, out var stringValue) == false)
             {
                 return defaultValue;
             }
@@ -307,14 +123,12 @@ namespace Gibbed.ProjectData
             var type = typeof(TType);
             if (type.IsEnum == true)
             {
-                TType result;
-                if (Enum.TryParse(stringValue, out result) == false)
+                if (Enum.TryParse(stringValue, out TType enumValue) == true)
                 {
-                    throw new ArgumentException("bad enum value", "name");
+                    return enumValue;
                 }
-                return result;
+                throw new ArgumentException("bad enum value", nameof(name));
             }
-
             return (TType)Convert.ChangeType(stringValue, type);
         }
 
@@ -339,17 +153,17 @@ namespace Gibbed.ProjectData
 
             foreach (var name in this.Dependencies)
             {
-                var dependency = this.Manager[name];
-                if (dependency != null)
+                if (this.Manager.TryGetProject(name, out var dependency) == false)
                 {
-                    LoadListsFrom(
-                        dependency.ListsPath,
-                        filter,
-                        hasher,
-                        modifier,
-                        extra,
-                        list);
+                    continue;
                 }
+                LoadListsFrom(
+                    dependency.ListsPath,
+                    filter,
+                    hasher,
+                    modifier,
+                    extra,
+                    list);
             }
 
             LoadListsFrom(
@@ -380,49 +194,43 @@ namespace Gibbed.ProjectData
 
             foreach (string listPath in Directory.GetFiles(basePath, filter, SearchOption.AllDirectories))
             {
-                using (var input = File.Open(listPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using var input = File.Open(listPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(input);
+                while (true)
                 {
-                    var reader = new StreamReader(input);
-
-                    while (true)
+                    string line = reader.ReadLine();
+                    if (line == null)
                     {
-                        string line = reader.ReadLine();
-                        if (line == null)
-                        {
-                            break;
-                        }
+                        break;
+                    }
 
-                        if (line.StartsWith(";") == true)
-                        {
-                            continue;
-                        }
+                    if (line.StartsWith(";") == true)
+                    {
+                        continue;
+                    }
 
-                        line = line.Trim();
-                        if (line.Length <= 0)
-                        {
-                            continue;
-                        }
+                    line = line.Trim();
+                    if (line.Length <= 0)
+                    {
+                        continue;
+                    }
 
-                        string source = modifier == null ? line : modifier(line);
-                        TType hash = hasher(source);
+                    string source = modifier == null ? line : modifier(line);
+                    TType hash = hasher(source);
 
-                        string otherSource;
-                        if (list.Lookup.TryGetValue(hash, out otherSource) == true &&
-                            otherSource != source)
-                        {
-                            throw new InvalidOperationException(
-                                string.Format(
-                                    "hash collision ('{0}' vs '{1}')",
-                                    source,
-                                    otherSource));
-                        }
+                    string otherSource;
+                    if (list.Lookup.TryGetValue(hash, out otherSource) == true &&
+                        otherSource != source)
+                    {
+                        throw new InvalidOperationException(
+                            $"hash collision ('{source}' vs '{otherSource}')");
+                    }
 
-                        list.Lookup[hash] = source;
+                    list.Lookup[hash] = source;
 
-                        if (extra != null)
-                        {
-                            extra(hash, source, line);
-                        }
+                    if (extra != null)
+                    {
+                        extra(hash, source, line);
                     }
                 }
             }

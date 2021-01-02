@@ -1,4 +1,4 @@
-﻿/* Copyright (c) 2019 Rick (rick 'at' gibbed 'dot' us)
+﻿/* Copyright (c) 2021 Rick (rick 'at' gibbed 'dot' us)
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -26,18 +26,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 
 namespace Gibbed.ProjectData
 {
     public class Manager : IEnumerable<Project>
     {
-        private string _ProjectPath;
-        private readonly List<Project> _Projects;
+        private string _BasePath;
+        private readonly Dictionary<string, Project> _Projects;
         private Project _ActiveProject;
 
         private Manager()
         {
-            this._Projects = new List<Project>();
+            this._Projects = new Dictionary<string, Project>();
         }
 
         public Project ActiveProject
@@ -46,19 +47,15 @@ namespace Gibbed.ProjectData
 
             set
             {
+                var currentPath = Path.Combine(this._BasePath, "current.txt");
                 if (value == null)
                 {
-                    File.Delete(Path.Combine(this._ProjectPath, "current.txt"));
+                    File.Delete(currentPath);
                 }
                 else
                 {
-                    using (var output = File.Create(Path.Combine(this._ProjectPath, "current.txt")))
-                    using (var writer = new StreamWriter(output))
-                    {
-                        writer.WriteLine(value.Name);
-                    }
+                    File.WriteAllText(currentPath, value.Name, Encoding.UTF8);
                 }
-
                 this._ActiveProject = value;
             }
         }
@@ -67,9 +64,21 @@ namespace Gibbed.ProjectData
         {
             get
             {
-                return this._Projects.SingleOrDefault(
-                    p => p.Name.ToLowerInvariant() == name.ToLowerInvariant());
+                if (string.IsNullOrEmpty(name) == true)
+                {
+                    throw new ArgumentNullException(nameof(name));
+                }
+                return this._Projects.TryGetValue(name, out var project) == false ? null : project;
             }
+        }
+
+        public bool TryGetProject(string name, out Project project)
+        {
+            if (string.IsNullOrEmpty(name) == true)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+            return this._Projects.TryGetValue(name, out project);
         }
 
         public static Manager Load()
@@ -79,51 +88,54 @@ namespace Gibbed.ProjectData
 
         public static Manager Load(string currentProject)
         {
-            var manager = new Manager();
+            string basePath;
+            basePath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            basePath = basePath != null ? Path.Combine(basePath, "projects") : "projects";
+            return Load(basePath, currentProject);
+        }
 
-            string projectPath;
-            projectPath = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            projectPath = projectPath != null ? Path.Combine(projectPath, "projects") : "projects";
-
-            manager._ProjectPath = projectPath;
-
-            if (Directory.Exists(projectPath) == true)
+        public static Manager Load(string basePath, string currentProject)
+        {
+            if (string.IsNullOrEmpty(basePath) == true)
             {
-                foreach (string xmlPath in Directory.GetFiles(projectPath, "*.xml", SearchOption.TopDirectoryOnly))
-                {
-                    manager._Projects.Add(Project.Create(xmlPath, manager));
-                }
+                throw new ArgumentNullException(nameof(basePath));
             }
 
-            if (currentProject != null)
+            if (string.IsNullOrEmpty(currentProject) == false)
             {
-                manager._ActiveProject = null;
-
                 currentProject = currentProject.Trim();
-                if (manager[currentProject] != null)
+            }
+
+            var manager = new Manager();
+            manager._BasePath = basePath;
+
+            var basePathExists = Directory.Exists(basePath);
+
+            if (basePathExists  == true)
+            {
+                foreach (string projectPath in Directory.GetFiles(basePath, "*.json", SearchOption.TopDirectoryOnly))
                 {
-                    manager._ActiveProject = manager[currentProject];
+                    var project = Project.Load(projectPath, manager);
+                    manager._Projects.Add(project.Name, project);
                 }
             }
-            else
-            {
-                var currentPath = Path.Combine(projectPath, "current.txt");
 
-                manager._ActiveProject = null;
+            if (string.IsNullOrEmpty(currentProject) == false)
+            {
+                if (manager.TryGetProject(currentProject, out var activeProject) == true)
+                {
+                    manager._ActiveProject = activeProject;
+                }
+            }
+            else if (basePathExists == true)
+            {
+                var currentPath = Path.Combine(basePath, "current.txt");
                 if (File.Exists(currentPath) == true)
                 {
-                    using (var input = File.OpenRead(currentPath))
-                    using (var reader = new StreamReader(input))
+                    currentProject = File.ReadAllText(currentPath).Trim();
+                    if (manager.TryGetProject(currentProject, out var activeProject) == true)
                     {
-                        string name = reader.ReadLine();
-                        if (name != null)
-                        {
-                            name = name.Trim();
-                            if (manager[name] != null)
-                            {
-                                manager._ActiveProject = manager[name];
-                            }
-                        }
+                        manager._ActiveProject = activeProject;
                     }
                 }
             }
@@ -134,7 +146,8 @@ namespace Gibbed.ProjectData
         public IEnumerator<Project> GetEnumerator()
         {
             return this._Projects
-                       .Where(p => p.Hidden == false &&
+                       .Values
+                       .Where(p => p.IsHidden == false &&
                                    p.InstallPath != null)
                        .GetEnumerator();
         }
@@ -142,8 +155,9 @@ namespace Gibbed.ProjectData
         IEnumerator IEnumerable.GetEnumerator()
         {
             return this._Projects
+                       .Values
                        .Where(p =>
-                              p.Hidden == false &&
+                              p.IsHidden == false &&
                               p.InstallPath != null)
                        .GetEnumerator();
         }
@@ -178,7 +192,7 @@ namespace Gibbed.ProjectData
         {
             if (name == null)
             {
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
             }
 
             if (this.ActiveProject == null)
@@ -194,7 +208,7 @@ namespace Gibbed.ProjectData
         {
             if (name == null)
             {
-                throw new ArgumentNullException("name");
+                throw new ArgumentNullException(nameof(name));
             }
 
             if (this.ActiveProject == null)
