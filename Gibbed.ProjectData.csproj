@@ -1,6 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AssemblyTitle>Gibbed.ProjectData</AssemblyTitle>
+    <LangVersion>9.0</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup>
     <Product>Gibbed.ProjectData</Product>
     <Company>Gibbed</Company>
     <Authors>Gibbed</Authors>
