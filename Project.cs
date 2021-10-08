@@ -29,19 +29,64 @@ namespace Gibbed.ProjectData
 {
     public sealed class Project
     {
-        public string Name { get; init; }
-        public bool IsHidden { get; init; }
-        public string InstallPath { get; init; }
-        public string ListsPath { get; init; }
-
-        internal List<string> Dependencies { get; }
-        internal Dictionary<string, string> Settings { get; }
-        internal Manager Manager { get; init; }
-
         private Project()
         {
             this.Dependencies = new List<string>();
             this.Settings = new Dictionary<string, string>();
+        }
+
+        public string Name
+        {
+            get;
+#if NET5_0_OR_GREATER
+            init;
+#else
+            private set;
+#endif
+        }
+
+        public bool IsHidden
+        {
+            get;
+#if NET5_0_OR_GREATER
+            init;
+#else
+            private set;
+#endif
+        }
+
+        public string InstallPath
+        {
+            get;
+#if NET5_0_OR_GREATER
+            init;
+#else
+            private set;
+#endif
+        }
+
+        public string ListsPath
+        {
+            get;
+#if NET5_0_OR_GREATER
+            init;
+#else
+            private set;
+#endif
+        }
+
+
+        internal List<string> Dependencies { get; }
+        internal Dictionary<string, string> Settings { get; }
+
+        internal Manager Manager
+        {
+            get;
+#if NET5_0_OR_GREATER
+            init;
+#else
+            private set;
+#endif
         }
 
         internal static Project Load(string path, Manager manager)
@@ -62,7 +107,7 @@ namespace Gibbed.ProjectData
                     ? Path.Combine(parentPath, definition.ListsPath)
                     : Path.GetFullPath(definition.ListsPath);
 
-            var project = new Project
+            var project = new Project()
             {
                 Name = definition.Name,
                 IsHidden = definition.IsHidden,

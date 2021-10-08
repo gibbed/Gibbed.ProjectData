@@ -111,7 +111,7 @@ namespace Gibbed.ProjectData
 
             var basePathExists = Directory.Exists(basePath);
 
-            if (basePathExists  == true)
+            if (basePathExists == true)
             {
                 foreach (string projectPath in Directory.GetFiles(basePath, "*.json", SearchOption.TopDirectoryOnly))
                 {

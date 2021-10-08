@@ -58,10 +58,12 @@ namespace Gibbed.ProjectData
                 {
                     case "registry":
                     {
+#if NET5_0_OR_GREATER
                         if (OperatingSystem.IsWindows() == false)
                         {
                             return false;
                         }
+#endif
                         string value;
                         try
                         {
@@ -83,10 +85,12 @@ namespace Gibbed.ProjectData
 
                     case "registryview":
                     {
+#if NET5_0_OR_GREATER
                         if (OperatingSystem.IsWindows() == false)
                         {
                             return false;
                         }
+#endif
                         string value;
                         try
                         {
