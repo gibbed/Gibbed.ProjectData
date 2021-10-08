@@ -50,8 +50,7 @@ namespace Gibbed.ProjectData.Definitions
         [JsonProperty("key")]
         public string RegistryKeyName { get; set; }
 
-        [JsonProperty("value")]
-        public string RegistryValueName { get; set; }
+        public string RegistryValueName => this.Value;
 
         [JsonProperty("default_value")]
         public string RegistryDefaultValue { get; set; }
