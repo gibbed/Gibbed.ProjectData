@@ -31,7 +31,6 @@ namespace Gibbed.ProjectData
     {
         private Project()
         {
-            this.Dependencies = new List<string>();
             this.Settings = new Dictionary<string, string>();
         }
 
@@ -76,20 +75,9 @@ namespace Gibbed.ProjectData
         }
 
 
-        internal List<string> Dependencies { get; }
         internal Dictionary<string, string> Settings { get; }
 
-        internal Manager Manager
-        {
-            get;
-#if NET5_0_OR_GREATER
-            init;
-#else
-            private set;
-#endif
-        }
-
-        internal static Project Load(string path, Manager manager)
+        public static Project Load(string path)
         {
             if (string.IsNullOrEmpty(path) == true)
             {
@@ -113,9 +101,7 @@ namespace Gibbed.ProjectData
                 IsHidden = definition.IsHidden,
                 InstallPath = InstallLocation.Get(parentPath, definition.InstallLocations),
                 ListsPath = listsPath,
-                Manager = manager,
             };
-            project.Dependencies.AddRange(definition.Dependencies);
             foreach (var kv in definition.Settings)
             {
                 project.Settings.Add(kv.Key, kv.Value);
@@ -195,22 +181,6 @@ namespace Gibbed.ProjectData
             Action<TType, string, string> extra)
         {
             var list = new HashList<TType>();
-
-            foreach (var name in this.Dependencies)
-            {
-                if (this.Manager.TryGetProject(name, out var dependency) == false)
-                {
-                    continue;
-                }
-                LoadListsFrom(
-                    dependency.ListsPath,
-                    filter,
-                    hasher,
-                    modifier,
-                    extra,
-                    list);
-            }
-
             LoadListsFrom(
                 this.ListsPath,
                 filter,
@@ -218,7 +188,6 @@ namespace Gibbed.ProjectData
                 modifier,
                 extra,
                 list);
-
             return list;
         }
         #endregion
